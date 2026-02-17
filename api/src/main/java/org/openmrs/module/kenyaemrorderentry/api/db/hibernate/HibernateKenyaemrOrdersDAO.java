@@ -1000,12 +1000,29 @@ public class HibernateKenyaemrOrdersDAO implements KenyaemrOrdersDAO {
         }
         criteria.add(Restrictions.eq("status", status));
         criteria.add(Restrictions.eq("voided", false));
-        criteria.add(Restrictions.or(Restrictions.isNull("dateLastChecked"), Restrictions.le("dateLastChecked", createdOnOrAfterDate)));
+		criteria.add(Restrictions.or(Restrictions.isNull("dateLastChecked"), Restrictions.le("dateLastChecked", createdOnOrBeforeDate)));
         criteria.addOrder(org.hibernate.criterion.Order.asc("id"));
         criteria.setMaxResults(100);
 
         return criteria.list();
     }
+	
+	@Override
+	public List<LimsQueue> getLimsSubmittedEntriesByStatus(LimsQueueStatus status, Date createdOnOrAfterDate, Date createdOnOrBeforeDate, boolean filterOrdersOnly) {
+		Criteria criteria = this.sessionFactory.getCurrentSession().createCriteria(LimsQueue.class);
+		if (filterOrdersOnly) {
+			criteria.setProjection(Projections.projectionList()
+					.add(Projections.property("order"), "order"))
+				.setResultTransformer(Transformers.aliasToBean(LimsQueue.class));
+		}
+		criteria.add(Restrictions.eq("status", status));
+		criteria.add(Restrictions.eq("voided", false));
+		criteria.add(Restrictions.or(Restrictions.isNotNull("dateLastChecked"), Restrictions.ge("dateLastChecked", createdOnOrAfterDate)));	
+		criteria.addOrder(org.hibernate.criterion.Order.asc("id"));
+		criteria.setMaxResults(100);
+
+		return criteria.list();
+	}
 
     public List<LimsQueue> getLimsQueueOrdersByStatus(String status, Date createdOnOrAfterDate, Date createdOnOrBeforeDate) {
         /*Criteria cr = session.createCriteria(User.class)

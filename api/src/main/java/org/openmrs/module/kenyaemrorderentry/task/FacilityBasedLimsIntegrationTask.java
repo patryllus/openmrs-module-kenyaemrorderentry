@@ -3,6 +3,7 @@ package org.openmrs.module.kenyaemrorderentry.task;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.openmrs.GlobalProperty;
+import org.openmrs.Order;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.kenyaemrorderentry.ModuleConstants;
 import org.openmrs.module.kenyaemrorderentry.api.service.KenyaemrOrdersService;
@@ -27,12 +28,15 @@ import java.util.List;
  */
 public class FacilityBasedLimsIntegrationTask extends AbstractTask {
 	private Log log = LogFactory.getLog(getClass());
+	private static Boolean debugMode = false;
+
 	/**
 	 * @see AbstractTask#execute()
 	 */
 	public void execute() {
-		System.out.println("Facility based LIMS-EMR integration: PUSH TASK Starting");
-			Context.openSession();
+		debugMode = labsUtils.isLoggingEnabled();
+		if (debugMode) System.out.println("Facility based LIMS-EMR integration: PUSH TASK Starting");
+		Context.openSession();
 			String limsIntegrationEnabled = "";
 			GlobalProperty enableLimsIntegration = Context.getAdministrationService().getGlobalPropertyObject(ModuleConstants.GP_ENABLE_LIMS_INTEGRATION);
 			limsIntegrationEnabled = enableLimsIntegration != null ? enableLimsIntegration.getPropertyValue().trim() : null;
@@ -47,25 +51,51 @@ public class FacilityBasedLimsIntegrationTask extends AbstractTask {
 			List<LimsQueue> queuedLabTests = kenyaemrOrdersService.getLimsQueueEntriesByStatus(LimsQueueStatus.QUEUED, null, effectiveDate, false);
 
 			if (queuedLabTests.isEmpty()) {
-				System.out.println("Facility based LIMS-EMR integration PUSH: There are no tests to send to LIMS");
+				if (debugMode) System.out.println("Facility based LIMS-EMR integration PUSH: There are no tests to send to LIMS");
 				return;
 			}
-			int counter = 0;
-			for (LimsQueue limsQueue : queuedLabTests) {
-				try {
-					if (labsUtils.isOrderForExpressPatient(limsQueue.getOrder()) || !labsUtils.orderHasUnsettledBill(limsQueue.getOrder())) {
-						LimsSystemWebRequest.postLabOrderRequestToLims(limsQueue.getPayload());
-						limsQueue.setStatus(LimsQueueStatus.SUBMITTED);
-						limsQueue.setDateLastChecked(new Date());
-						kenyaemrOrdersService.saveLimsQueue(limsQueue);
-						counter++;
-					}
-				} catch (Exception e) {
-					System.out.println("Facility based LIMS-EMR integration PUSH:" + e.getMessage());
+		int counter = 0;
+
+		for (LimsQueue limsQueue : queuedLabTests) {
+			try {
+				Order order = limsQueue.getOrder();
+
+				boolean eligible =
+					labsUtils.isOrderForExpressPatient(order) ||
+						!labsUtils.orderHasUnsettledBill(order);
+
+				if (!eligible) {
+					continue;
 				}
+
+				boolean success = LimsSystemWebRequest
+					.postLabOrderRequestToLims(limsQueue.getPayload());
+
+				if (success) {
+					limsQueue.setStatus(LimsQueueStatus.SUBMITTED);
+					limsQueue.setDateLastChecked(new Date());
+					kenyaemrOrdersService.saveLimsQueue(limsQueue);
+					counter++;
+				}
+
+			} catch (IOException e) {
+				if (debugMode) System.out.println(
+					"LIMS PUSH IO error for order "
+						+ limsQueue.getOrder().getOrderId()
+						+ ": " + e.getMessage()
+				);
+
+			} catch (Exception e) {
+				if (debugMode) System.out.println(
+					"LIMS PUSH error for order "
+						+ limsQueue.getOrder().getOrderId()
+						+ ": " + e.getMessage()
+				);
 			}
-			Context.closeSession();
-			System.out.println("Facility based LIMS-EMR integration PUSH: Number of pushed requests = " + counter);
+		}
+
+		Context.closeSession();
+		if (debugMode) System.out.println("Facility based LIMS-EMR integration PUSH: Number of pushed requests = " + counter);
 		}
 
 

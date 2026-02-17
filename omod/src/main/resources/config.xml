@@ -450,5 +450,13 @@
 			A comma separated list of express payment methods' UUID. Example: xxxxx,yyyy,zzzz
 		</description>
 	</globalProperty>
+	<globalProperty>
+		
+		<property>kenyaemrorderentry.debugmode.enabled</property>
+		<defaultValue>false</defaultValue>
+		<description>
+			Enables logging for troubleshooting. Disable on prod
+		</description>
+	</globalProperty>
 </module>
 
