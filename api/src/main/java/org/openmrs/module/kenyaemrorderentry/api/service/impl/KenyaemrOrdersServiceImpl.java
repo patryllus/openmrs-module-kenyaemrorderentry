@@ -504,6 +504,11 @@ public class KenyaemrOrdersServiceImpl extends BaseOpenmrsService implements Ken
         return dao.getLimsQueueEntriesByStatus(status, createdOnOrAfterDate, createdOnOrBeforeDate, filterOrdersOnly);
     }
 
+	@Override
+	public List<LimsQueue> getLimsSubmittedEntriesByStatus(LimsQueueStatus status, Date createdOnOrAfterDate, Date createdOnOrBeforeDate, boolean filterOrdersOnly) {
+		return dao.getLimsSubmittedEntriesByStatus(status, createdOnOrAfterDate, createdOnOrBeforeDate, filterOrdersOnly);
+	}
+
     @Override
     public List<LabManifestOrder> getLabManifestOrders(String uuid, String manifestuuid, String status, String type, String withError,
             String query, Date createdOnOrAfterDate, Date createdOnOrBeforeDate) {

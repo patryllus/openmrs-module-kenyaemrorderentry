@@ -33,9 +33,11 @@ import java.util.Date;
 public class LimsIntegration implements AfterReturningAdvice {
 
     private Log log = LogFactory.getLog(this.getClass());
+	private static Boolean debugMode = false;
 
     @Override
     public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {
+		debugMode = labsUtils.isLoggingEnabled();
         String limsIntegrationEnabled = "";
         GlobalProperty enableLimsIntegration = Context.getAdministrationService().getGlobalPropertyObject(ModuleConstants.GP_ENABLE_LIMS_INTEGRATION);
         limsIntegrationEnabled = enableLimsIntegration.getPropertyValue().trim();
@@ -85,12 +87,12 @@ public class LimsIntegration implements AfterReturningAdvice {
                                 System.out.println(e.getMessage());
                             }
                         } else {
-                            System.err.println("LIMS-EMR integration: Could not generate the payload for LIMS data exchange");
+							if (debugMode) System.out.println("LIMS-EMR integration: Could not generate the payload for LIMS data exchange");
                         }
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Error intercepting order before creation: " + e.getMessage());
+				if (debugMode) System.out.println("Error intercepting order before creation: " + e.getMessage());
                 e.printStackTrace();
             }
         }

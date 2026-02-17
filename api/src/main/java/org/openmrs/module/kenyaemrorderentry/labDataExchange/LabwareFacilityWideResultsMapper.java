@@ -32,6 +32,7 @@ import java.util.Map;
 public class LabwareFacilityWideResultsMapper {
 	public static final String LAB_TEST_RESULT_SET_PROPERTY = "result";
 	public static String LAB_ENCOUNTER_TYPE_UUID = "e1406e88-e9a9-11e8-9f32-f2801f1b9fd1";
+	private static Boolean debugMode = false;
 
 	public LabwareFacilityWideResultsMapper() {
 	}
@@ -86,13 +87,14 @@ public class LabwareFacilityWideResultsMapper {
 	 * @return
 	 */
 	public static ResponseEntity<String> processResultsFromLims(String resultPayload) {
-		System.out.println("Start Processing results from LIMs" + resultPayload);
+		debugMode = labsUtils.isLoggingEnabled();
+		if (debugMode) System.out.println("Start Processing results from LIMs" + resultPayload);
 		JsonElement rootNode = JsonParser.parseString(resultPayload);
 		JsonObject resultsObj = null;
 		try {
 			if (rootNode.isJsonObject()) {
 				resultsObj = rootNode.getAsJsonObject();
-				System.out.println("Result object" + resultPayload);
+				if (debugMode) System.out.println("Result object" + resultPayload);
 			} else {
 				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("The payload could not be understood. An object is expected!");
 			}
@@ -100,7 +102,7 @@ public class LabwareFacilityWideResultsMapper {
 			e.printStackTrace();
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("An error occured: " + e.getMessage());
 		}
-
+		
 		if (resultsObj != null) {
 			Map<String, String> resultMap = new HashMap<>();
 			JsonArray resultArray = resultsObj.get("data").getAsJsonArray();			
@@ -108,12 +110,12 @@ public class LabwareFacilityWideResultsMapper {
 			for (int i = 0; i < resultArray.size(); i++) {
 				try {
 					JsonObject o = resultArray.get(i).getAsJsonObject();
-					orderId = o.get("labRequestId").getAsInt();					
-					String testName = !o.isJsonNull() && !o.get("resultName").isJsonNull() ? o.get("resultName").getAsString() : "";
-					String result = !o.isJsonNull() && !o.get("resultValue").isJsonNull() ? o.get("resultValue").getAsString() : "";
+					orderId = o.get("identifier").getAsInt();					
+					String testName = !o.isJsonNull() && !o.get("codeText").isJsonNull() ? o.get("codeText").getAsString() : "";
+					String result = !o.isJsonNull() && !o.get("value").isJsonNull() ? o.get("value").getAsString() : "";
 					if (StringUtils.isNotBlank(testName) && StringUtils.isNotBlank(result)) {
 						resultMap.put(testName, result);
-						System.out.println("Result Map" + resultMap);
+						if (debugMode) System.out.println("Result Map" + resultMap);
 					}
 				} catch (Exception ex) {
 					ex.printStackTrace();
@@ -122,6 +124,7 @@ public class LabwareFacilityWideResultsMapper {
 				}
 			}
 			// update results and complete the order
+			if (debugMode) System.out.println("Result Map " +resultMap+ "For Order ID "+orderId);
 			return mapLimsResultsInEmr(orderId, resultMap);
 		} else {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("The system could not extract the test results from LIMS details");
@@ -138,9 +141,12 @@ public class LabwareFacilityWideResultsMapper {
 	 *                   Results for lab sets are handled as grouped observations with a reference to the parent order.
 	 */
 	public static ResponseEntity<String> mapLimsResultsInEmr(Integer orderId, Map<String, String> limsResult) {
+		debugMode = labsUtils.isLoggingEnabled();
+		if (debugMode) System.out.println("Starting mapping ==>");
 		if (limsResult == null || limsResult.isEmpty()) {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("The system encountered empty results from LIMS");
 		}
+		if (debugMode) System.out.println("Mapping result Map " +limsResult+ "For Order ID "+orderId);
 		EncounterType labEncounterType = Context.getEncounterService().getEncounterTypeByUuid(LAB_ENCOUNTER_TYPE_UUID);
 		EncounterService encounterService = Context.getEncounterService();
 		ConceptService conceptService = Context.getConceptService();
@@ -149,7 +155,7 @@ public class LabwareFacilityWideResultsMapper {
 
 		Order order = Context.getOrderService().getOrder(orderId);
 		Concept orderConcept = order.getConcept();
-
+		if (debugMode) System.out.println("Order Concept ==>"+orderConcept);
 		if (orderConcept != null) {		
 			ObjectNode mapping = readLabTestMappingConfiguration();
 			if (mapping == null) {
@@ -158,10 +164,10 @@ public class LabwareFacilityWideResultsMapper {
 			// Get mapping for the test concept
 		  ObjectNode testConceptMapping = (ObjectNode) mapping.get(orderConcept.getUuid());		
 			if (testConceptMapping == null) {
-				System.out.println("Mapping does not exists ==>");
+				if (debugMode) System.out.println("Mapping does not exists ==>");
 				return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("LIMS lab test configuration doesn't support result mapping for test " + orderConcept.getUuid());
 			}
-			System.out.println("Mapping exists ==>");
+			if (debugMode) System.out.println("Mapping exists ==>");
 			// setup lab result encounter
 			Encounter enc = new Encounter();
 			enc.setEncounterType(labEncounterType);
@@ -193,7 +199,7 @@ public class LabwareFacilityWideResultsMapper {
 			 * "WBC": 123, "RDW": 679, "someQualitativeTest":"Positive"
 			 */
 			if (orderConcept.isSet() && orderConcept.getSetMembers().size() > 0) {
-				System.out.println("Test is a set ==>");
+				if (debugMode) System.out.println("Test is a set ==>");
 				ObjectNode resultSet = (ObjectNode) testConceptMapping.get(LAB_TEST_RESULT_SET_PROPERTY);
 				// loop through the results and create an obs group
 				for (Map.Entry<String, String> entry : limsResult.entrySet()) {
@@ -274,7 +280,7 @@ public class LabwareFacilityWideResultsMapper {
 				return ResponseEntity.status(HttpStatus.OK).body("Lab results updated successfully");
 
 			} catch (Exception e) {
-				System.out.println(e.getMessage());
+				if (debugMode) System.out.println(e.getMessage());
 				e.printStackTrace();
 				return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error was encountered while updating results for " + order.getConcept().getUuid() + ". Error: " + e.getMessage());
 			}

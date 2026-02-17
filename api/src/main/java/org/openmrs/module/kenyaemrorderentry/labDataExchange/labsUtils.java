@@ -40,10 +40,10 @@ public class labsUtils {
 	public static String formatGender(String input) {
 		String in = input.trim().toLowerCase();
 		if (in.equalsIgnoreCase("m"))
-			return ("M");
+			return ("male");
 		if (in.equalsIgnoreCase("f"))
-			return ("F");
-		return ("M");
+			return ("female");
+		return ("male");
 	}
 
 	public static SimpleDateFormat getSimpleDateFormat(String pattern) {
@@ -130,5 +130,23 @@ public class labsUtils {
 			}
 		}
 		return false;
+	}
+	/**
+	 * Checks whether Kenyaemr Logging is enabled
+	 *
+	 * @return true (Enabled) and false (Disabled)
+	 */
+	public static Boolean isLoggingEnabled() {
+		Boolean ret = false;
+
+		GlobalProperty globalLoggingEnabled = Context.getAdministrationService().getGlobalPropertyObject(
+			ModuleConstants.LOGGING_ENABLED);
+		String isLoggingEnabled = globalLoggingEnabled.getPropertyValue();
+
+		if (isLoggingEnabled != null && isLoggingEnabled.trim().equalsIgnoreCase("true")) {
+			ret = true;
+		}
+
+		return (ret);
 	}
 }
