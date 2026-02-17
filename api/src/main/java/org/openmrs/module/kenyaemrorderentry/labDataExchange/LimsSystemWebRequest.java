@@ -12,6 +12,7 @@ package org.openmrs.module.kenyaemrorderentry.labDataExchange;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -21,6 +22,7 @@ import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -47,6 +49,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -59,6 +62,7 @@ public class LimsSystemWebRequest {
     public static final String LAB_TEST_CODE_PROPERTY = "testCode";
 	public static final String OPENMRS_ID = "dfacd928-0370-4315-99d7-6ec1c9f7ae76";
     private static final Logger log = LoggerFactory.getLogger(PushLabRequestsTask.class);
+	private static Boolean debugMode = false;
 
     /**
      * Generates the order payload used to post to Lims server
@@ -67,18 +71,19 @@ public class LimsSystemWebRequest {
      * @return
      */
     public static JSONObject generateLIMSpostPayload(Order order) {
+		debugMode = labsUtils.isLoggingEnabled();
         SimpleDateFormat sd = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
         JSONObject payload = new JSONObject();
 
         // Get mapping for the test concept
         ObjectNode mapping = readLabTestMappingConfiguration();
         if (mapping == null) {
-            System.out.println("LIMS-EMR mapping configuration is missing or invalid!");
+			if (debugMode) System.out.println("LIMS-EMR mapping configuration is missing or invalid!");
             return payload;
         }
         ObjectNode testConceptMapping = (ObjectNode) mapping.get(order.getConcept().getUuid());
         if (testConceptMapping == null) {
-            System.out.println("LIMS-EMR mapping: No mapping found for order concept: " + order.getConcept().getId());
+			if (debugMode) System.out.println("LIMS-EMR mapping: No mapping found for order concept: " + order.getConcept().getId());
             return payload;
         }
 
@@ -87,7 +92,7 @@ public class LimsSystemWebRequest {
         // assign labTestId as test code from mapper. We want to fail early if there is no mapping for the order
         labTestId = testConceptMapping.has(LAB_TEST_CODE_PROPERTY)? testConceptMapping.get(LAB_TEST_CODE_PROPERTY).asText() : null;
         if (StringUtils.isBlank(labTestId)) {
-            System.out.println("LIMS-EMR mapping: Test code not found for the order concept: " + order.getConcept().getId());
+			if (debugMode) System.out.println("LIMS-EMR mapping: Test code not found for the order concept: " + order.getConcept().getId());
             return payload;
         }
 		PatientIdentifierType openmrsIdType = MetadataUtils.existing(PatientIdentifierType.class, OPENMRS_ID);		
@@ -136,7 +141,7 @@ public class LimsSystemWebRequest {
         List<Diagnosis> allDiagnosis = diagnosisService.getDiagnosesByEncounter(order.getEncounter(), false, false);
         if (!allDiagnosis.isEmpty()) {
             for (Diagnosis diagnosisType : allDiagnosis) {
-                if (diagnosisType.getCertainty().equals(ConditionVerificationStatus.CONFIRMED)) {
+                if (diagnosisType.getCertainty().equals(ConditionVerificationStatus.PROVISIONAL)) {
                     diagnosisName = diagnosisType.getDiagnosis().getCoded().getName().getName();
                 } else {
                     diagnosisName = diagnosisType.getDiagnosis().getCoded().getName().getName();
@@ -148,44 +153,54 @@ public class LimsSystemWebRequest {
         requestedByName = order.getCreator().getGivenName() != null ? order.getCreator().getGivenName() : "";
         labRequestId = order.getOrderId().toString();
         testName = order.getConcept().getName().getName();
+		//Add performer and requester facility MFL
+		String facilityCode = Utils.getDefaultLocationMflCode(Utils.getDefaultLocation());
+		
+		
         Context.removeProxyPrivilege(PrivilegeConstants.SQL_LEVEL_ACCESS);
 
         //Create LIMS order payload
 
-        payload.put("Address", address + "" + village + "" + landmark);
-        payload.put("DateRequestReceived", dateRequestReceived);
-        payload.put("Diagnosis", diagnosisName != null ? diagnosisName : "No Diagnosis");
-        payload.put("IsUrgent", true);
-        payload.put("LabRequestId", labRequestId);
+        payload.put("patientAddress", address + "" + village + "" + landmark);
+        payload.put("authoredOn", dateRequestReceived);
+        payload.put("reasonCode", diagnosisName != null ? diagnosisName : "No Diagnosis");
+        payload.put("priority", "routine");
+        payload.put("identifier", labRequestId);
         //Test Object
         JSONObject testsObj = new JSONObject();
         JSONArray labTest = new JSONArray();
-        testsObj.put("LabTestId", labTestId);
-        testsObj.put("LabTestName", testName);
+        testsObj.put("identifier", labTestId);
+        testsObj.put("text", testName);
         labTest.add(testsObj);
-        payload.put("LabTests", labTest);
+        payload.put("code", labTest);
 
-        payload.put("location", ward);
-        payload.put("PatientAge", age);
-        payload.put("PatientBedNumber", "");
-        payload.put("PatientBirthDate", dob);
-        payload.put("PatientFirstName", firstName);
-        payload.put("PatientGender", gender != null ? labsUtils.formatGender(gender) : null);
-        payload.put("PatientId", patientId);
-        payload.put("OpenMrsId", openmrsId);
-        payload.put("PatientOtherName", middleName);
-        payload.put("PatientPhone", patient.getAttribute("Telephone contact") != null ? patient.getAttribute("Telephone contact").getValue() : "");
-        payload.put("PatientStage", "OUTPATIENT");
-        payload.put("PatientSurname", lastName);
-        payload.put("PatientWard", "");
-        payload.put("ReceiptNumber", "");
-        payload.put("RequestedByName", requestedByName);
+        payload.put("locationReference", ward);
+		payload.put("subjectIdentifier", openmrsId);
+        payload.put("patientAge", age);
+        payload.put("patientBed", "");
+        payload.put("patientBirthDate", dob);
+        payload.put("patientGivenName", firstName);
+        payload.put("patientGender", gender != null ? labsUtils.formatGender(gender) : null);
+        payload.put("subject", patientId);        
+        payload.put("patientMiddleName", middleName);
+        payload.put("patientTelecom", patient.getAttribute("Telephone contact") != null ? patient.getAttribute("Telephone contact").getValue() : "");
+        payload.put("encounterClass", "OUTPATIENT");
+        payload.put("patientFamilyName", lastName);
+        payload.put("patientWard", "");
+        payload.put("requisition", "");
+		payload.put("requisitionType", "PHYSICAL");
+        payload.put("requester", requestedByName);
+        payload.put("requesterMFL", facilityCode);
+        payload.put("performerMFL", facilityCode);
+
+		if (debugMode) System.out.println("Payload generated for orderId : " +labRequestId+ "to send to Lims");
 
         return payload;
 
     }
 
     public static boolean postLabOrderRequestToLims(String params) throws IOException {
+		debugMode = labsUtils.isLoggingEnabled();
         String serverUrl = "";
         String API_KEY = "";
         GlobalProperty gpLIMsServerPushUrl = Context.getAdministrationService().getGlobalPropertyObject(ModuleConstants.GP_LIMS_LAB_SERVER_REQUEST_URL);
@@ -193,71 +208,74 @@ public class LimsSystemWebRequest {
         serverUrl = gpLIMsServerPushUrl.getPropertyValue().trim();
         API_KEY = gpLIMsApiToken.getPropertyValue().trim();
         SSLConnectionSocketFactory sslsf = null;
-        GlobalProperty gpSslVerification = Context.getAdministrationService().getGlobalPropertyObject(ModuleConstants.GP_SSL_VERIFICATION_ENABLED);
+        GlobalProperty gpSslVerification = Context.getAdministrationService().getGlobalPropertyObject(ModuleConstants.GP_SSL_VERIFICATION_ENABLED);		
 
-        if (gpSslVerification != null) {
-            String sslVerificationEnabled = gpSslVerification.getPropertyValue();
-            if (StringUtils.isNotBlank(sslVerificationEnabled)) {
-                if (sslVerificationEnabled.equals("true")) {
-                    sslsf = Utils.sslConnectionSocketFactoryDefault();
-                } else {
-                    sslsf = Utils.sslConnectionSocketFactoryWithDisabledSSLVerification();
-                }
-            }
-        }
+		if (gpSslVerification != null) {
+			String sslVerificationEnabled = gpSslVerification.getPropertyValue();
 
-        CloseableHttpClient httpClient = HttpClients.custom().setSSLSocketFactory(sslsf).build();
+			if (StringUtils.isNotBlank(sslVerificationEnabled)) {
+				if (sslVerificationEnabled.equalsIgnoreCase("true")) {
+					sslsf = Utils.sslConnectionSocketFactoryDefault();
+				} else {
+					sslsf = Utils.sslConnectionSocketFactoryWithDisabledSSLVerification();
+				}
+			}
+		}
 
-        try {
+		boolean success = false;
 
-            //Define a post request
-            System.out.println("LIMs Lab Results POST: Server URL: " + serverUrl);
-            HttpPost postRequest = new HttpPost(serverUrl);
-            //Set the API media type in http content-type header
-            postRequest.addHeader("content-type", "application/json");
+		try (CloseableHttpClient httpClient =
+				 (sslsf != null)
+					 ? HttpClients.custom().setSSLSocketFactory(sslsf).build()
+					 : HttpClients.createDefault()) {
 
-            // If using api-key
-            postRequest.setHeader("x-api-key", API_KEY);
-            //Set the request post body
-            String payload = params;
-            System.out.println("LIMS Lab Request POST: Server Payload: " + payload);
-            StringEntity userEntity = new StringEntity(payload);
-            postRequest.setEntity(userEntity);
-            HttpResponse response = httpClient.execute(postRequest);
+			String payload = params;
 
-            //verify the valid error code first
-            int statusCode = response.getStatusLine().getStatusCode();
+			if (debugMode) System.out.println("LIMS Lab Results POST: Server URL: " + serverUrl);
+			if (debugMode) System.out.println("LIMS Lab Request POST: Server Payload: " + payload);
 
-            if (statusCode == 400) { // Missing required fields
-                System.out.println("Missing required fields");
-                log.warn("Missing required fields");
-                return (false);
-            } else if (statusCode == 401) { // Unauthorized Access
-                System.out.println("Unauthorized Access");
-                log.warn("Unauthorized Access");
-                return (false);
-            } else if (statusCode == 500) { // Couldn't connect to server
-                System.out.println("Could not connect to server");
-                log.warn("Could not connect to server");
-                return (false);
-            } else if (statusCode == 200) {
-                System.out.println("LIMs Lab Request POST: Successfully pushed a lab test");
-                log.info("LIMs Lab Request POST: Successfully pushed a lab test");
+			HttpPost postRequest = new HttpPost(serverUrl);
+			postRequest.setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+			postRequest.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY);
 
-                Context.flushSession();
-                System.out.println("Labware Lab Results POST: Push Successfull");
-                return (true);
-            }
-        } catch (Exception e) {
-            System.err.println("LIMs Lab Request POST: Could not push requests to the lab! " + e.getMessage());
-            log.error("LIMs Lab Request POST: Could not push requests to the lab! " + e.getMessage());
-            e.printStackTrace();
-        } finally {
-            httpClient.close();
-        }
+			postRequest.setEntity(new StringEntity(payload, StandardCharsets.UTF_8));
 
-        return (false);
-    }
+			try (CloseableHttpResponse response = httpClient.execute(postRequest)) {
+
+				int statusCode = response.getStatusLine().getStatusCode();
+				String responseBody = response.getEntity() != null
+					? EntityUtils.toString(response.getEntity())
+					: "";
+
+				if (debugMode) System.out.println("Labware status code ==> " + statusCode);
+				if (debugMode) System.out.println("Labware response ==> " + responseBody);
+
+				if (statusCode >= 200 && statusCode < 300) {
+					if (debugMode) System.out.println("LIMS Lab Request POST: Successfully pushed a lab test");
+					Context.flushSession();
+					success = true;
+
+				} else if (statusCode == 400) {
+					if (debugMode) System.out.println("Bad Request (Missing fields): " + responseBody);
+
+				} else if (statusCode == 401) {
+					if (debugMode) System.out.println("Unauthorized: Check API key");
+
+				} else if (statusCode >= 500) {
+					if (debugMode) System.out.println("Server error: " + responseBody);
+
+				} else {
+					if (debugMode) System.out.println("Unexpected status code: " + statusCode + " Body: " + responseBody);
+				}
+			}
+
+		} catch (Exception e) {
+			if (debugMode) System.out.println("LIMS Lab Request POST: Could not push requests to the lab!"+e);
+		}
+
+		return success;
+
+	}
 
     public static void pullFacilityWideLimsLabResult(List<Integer> orderIds) throws IOException {
         String serverUrl = "";
@@ -282,67 +300,54 @@ public class LimsSystemWebRequest {
 
         CloseableHttpClient httpClient = HttpClients.custom().setSSLSocketFactory(sslsf).build();
 
-        for (Integer order : orderIds) {
-            try {
+		for (Integer order : orderIds) {
+			try {
+				URIBuilder builder = new URIBuilder(serverUrl);
+				builder.addParameter("LabRequestId", order.toString());
+				URI uri = builder.build();
 
-                URIBuilder builder = new URIBuilder(serverUrl);
-                String currentOrder = order.toString();
+				HttpGet httpget = new HttpGet(uri);
+				httpget.setHeader(HttpHeaders.ACCEPT, "application/json");
+				httpget.setHeader(HttpHeaders.AUTHORIZATION, "Bearer " + API_KEY);
 
-                builder.addParameter("LabRequestId", currentOrder);
-                URI uri = builder.build();
-                System.out.println("Get Lims Results URL: " + uri);
+				try (CloseableHttpResponse response = httpClient.execute(httpget)) {
 
-                HttpGet httpget = new HttpGet(uri);
+					int statusCode = response.getStatusLine().getStatusCode();
+					if (debugMode) System.out.println("LIMS status for order {} ==> {} "+ order + "," +statusCode);
 
-                //Set the API media type in http content-type header
-                // If using api-key
-                httpget.addHeader("content-type", "application/json");
-                httpget.addHeader("x-api-key", API_KEY);
+					// 🚨 If not success, log and skip
+					if (statusCode != 200 && statusCode != 201) {
+						if (debugMode) System.out.println("Results for order " +order+ " not available. HTTP Status: {} " +statusCode);
+						continue;   // Move to next orderId immediately
+					}
+					if (debugMode) System.out.println("Results for order " +order+ " is now available. HTTP Status: {} " +statusCode);
+					// ✅ Only success reaches here
+					HttpEntity entity = response.getEntity();
+					if (entity != null) {
+						String jsonString = EntityUtils.toString(entity, StandardCharsets.UTF_8);
 
-                CloseableHttpResponse response = httpClient.execute(httpget);
-                System.out.println("Get Lims Results GET Request: " + httpget);
+						if (jsonString != null && !jsonString.isEmpty()) {
+							LabwareFacilityWideResultsMapper.processResultsFromLims(jsonString);
+							if (debugMode) System.out.println("Successfully processed LIMS result for order {} " +order);
+						} else {
+							if (debugMode) System.out.println("Empty response received for order {} " +order);
+						}
+					}
+				}
 
-                final int statusCode = response.getStatusLine().getStatusCode();
-                if (statusCode == 200 || statusCode == 201) {
-                    System.out.println("Get Lims Results: REST Call Success");
+			} catch (Exception e) {
+				if (debugMode) System.out.println("Error fetching LIMS results for order {} " +order + "," + e);
+				// automatically continues to next order
+			}
 
-                    String jsonString = null;
-                    HttpEntity entity = response.getEntity();
-                    if (entity != null) {
-                        BufferedReader rd = new BufferedReader(new InputStreamReader(entity.getContent()));
-
-                        try {
-                            jsonString = rd.lines().collect(Collectors.joining()).toString();                         
-                        } finally {
-                            rd.close();
-                        }
-                    }
-                    JSONParser parser = new JSONParser();
-                    JSONObject responseObject = (JSONObject) parser.parse(jsonString);
-
-                    if (responseObject != null && !responseObject.isEmpty()) {
-                        // Update Lims results order
-                        LabwareFacilityWideResultsMapper.processResultsFromLims(jsonString);
-                    }
-                    System.out.println("Lims Results Get: Successfully executed the task that pulls lab requests");
-                    log.info("Lims Results Get: Successfully executed the task that pulls lab requests");
-                    System.out.println("Lims Results Get: Successfully Done");
-                } else {
-                    System.err.println("Get Lims Lab Results Failed with HTTP error code : " + statusCode);
-                }
-            } catch (Exception e) {
-                System.err.println("Get Lims Lab Results Error: " + e.getMessage());
-                e.printStackTrace();
-            }
-            // Delay loop
-            try {
-                //Delay for 5 seconds
-                Thread.sleep(5000);
-            } catch (Exception ie) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        // finally
+			// Optional delay
+			try {
+				Thread.sleep(5000);
+			} catch (InterruptedException ie) {
+				Thread.currentThread().interrupt();
+			}
+		}
+		// finally
         httpClient.close();
     }
 

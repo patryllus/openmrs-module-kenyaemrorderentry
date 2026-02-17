@@ -38,6 +38,7 @@ public interface KenyaemrOrdersService extends OpenmrsService {
 
     List<LabManifest> getLabManifests(String uuid, String status, String type, String withErrors, String query, Date createdOnOrAfterDate, Date createdOnOrBeforeDate);
     List<LimsQueue> getLimsQueueEntriesByStatus(LimsQueueStatus status, Date createdOnOrAfterDate, Date createdOnOrBeforeDate, boolean filterOrdersOnly);
+    List<LimsQueue> getLimsSubmittedEntriesByStatus(LimsQueueStatus status, Date createdOnOrAfterDate, Date createdOnOrBeforeDate, boolean filterOrdersOnly);
     List<LabManifestOrder> getLabManifestOrders(String uuid, String manifestuuid, String status, String type, String withError, String query, Date createdOnOrAfterDate, Date createdOnOrBeforeDate);
 
     //Methods for manifest orders

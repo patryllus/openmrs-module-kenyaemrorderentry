@@ -80,6 +80,9 @@ public class ModuleConstants {
     public static final String GP_EXPRESS_PAYMENT_METHODS = "kenyaemrorderentry.facilitywidelims.expressPaymentMethods";
     public static final String VISIT_ATTRIBUTE_PAYMENT_METHOD_UUID = "e6cb0c3b-04b0-4117-9bc6-ce24adbda802";
 
+	// Logging GP
+	public static final String LOGGING_ENABLED = "kenyaemrorderentry.debugmode.enabled";
+
     // Manifest Types e.g VL, EID, FLU etc
     // public static final int NO_MANIFEST_TYPE_CONFIGURED = 0;
     // public static final int MANIFEST_TYPE_EID = 1;
