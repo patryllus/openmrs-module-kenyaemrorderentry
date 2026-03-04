@@ -278,6 +278,7 @@ public class LimsSystemWebRequest {
 	}
 
     public static void pullFacilityWideLimsLabResult(List<Integer> orderIds) throws IOException {
+		System.out.println("Pull Facility Wide Results and persist");
         String serverUrl = "";
         String API_KEY = "";
         GlobalProperty gpLIMsServerPushUrl = Context.getAdministrationService().getGlobalPropertyObject(ModuleConstants.GP_LIMS_LAB_SERVER_RESULT_URL);
