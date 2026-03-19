@@ -15,6 +15,7 @@ import org.openmrs.module.kenyaemrorderentry.api.service.KenyaemrOrdersService;
 import org.openmrs.module.kenyaemrorderentry.queue.LimsQueue;
 import org.openmrs.module.kenyaemrorderentry.queue.LimsQueueStatus;
 import org.openmrs.module.kenyaemrorderentry.util.Utils;
+import org.springframework.aop.scope.ScopedProxyUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -201,7 +202,7 @@ public class LabwareFacilityWideResultsMapper {
 
 					if (resultSet.get(limsTestName) != null) {
 						String memberConceptUuid = resultSet.get(limsTestName).asText();
-						Concept memberObsConcept = conceptService.getConceptByUuid(memberConceptUuid);						
+						Concept memberObsConcept = conceptService.getConceptByUuid(memberConceptUuid);					
 						Obs memberObs = constructObs(order);
 						if (memberObsConcept != null) {
 							memberObs.setConcept(memberObsConcept);
@@ -257,8 +258,17 @@ public class LabwareFacilityWideResultsMapper {
 					return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("The system extracted NULL test name or results from LIMS data for lab test " + orderConcept.getUuid());
 				}
 
-				if (orderConcept.getDatatype().isNumeric() || orderConcept.getDatatype().isText()) {
-					setObsValue(o, orderConcept, limsTestResult);
+				else if (orderConcept.getDatatype().isNumeric()) {
+					try {
+						Double.parseDouble(limsTestResult);
+						setObsValue(o, orderConcept, limsTestResult);
+					} catch (NumberFormatException e) {
+						if (debugMode) System.out.println("Lims Results format exception "+e.getMessage());
+						setObsValue(o, orderConcept, 0.0);						
+					}
+					
+				}else if (orderConcept.getDatatype().isText()) {
+						setObsValue(o, orderConcept, limsTestResult);
 				} else if (orderConcept.getDatatype().isCoded()) {
                    	ObjectNode resultSet = (ObjectNode) testConceptMapping.get(LAB_TEST_RESULT_SET_PROPERTY);
 					String codedAnswerConceptUuid = resultSet.get(limsTestResult).asText();
@@ -331,14 +341,30 @@ public class LabwareFacilityWideResultsMapper {
 			// NUMERIC
 			// =========================
 			if (dt.isNumeric()) {
-
-				Double numericValue = Double.valueOf(value);
-
-				if (numericValue.isNaN() || numericValue.isInfinite()) {
+				try {
+					Double.parseDouble(value);
+				} catch (NumberFormatException e) {
+					if (debugMode) System.out.println("Results format exception "+e.getMessage());
 					return;
 				}
 
-				// 🔎 Check reference range
+				double numericValue = 0.0;
+
+				try {
+					if (debugMode) System.out.println("Checking value is numeric first " + value);
+					numericValue = Double.parseDouble(value);
+
+					if (!Double.isFinite(numericValue)) {
+						if (debugMode) System.out.println("Value is not finite: " + value);
+						return;
+					}
+
+				} catch (NumberFormatException e) {
+					if (debugMode) System.out.println("Value is not numeric: " + e.getMessage());
+					numericValue = 0.0; // assign default if string
+				}
+
+// 🔎 Check reference range
 				ConceptNumeric numericConcept = Context.getConceptService()
 					.getConceptNumeric(concept.getConceptId());
 
@@ -348,19 +374,18 @@ public class LabwareFacilityWideResultsMapper {
 					Double low = numericConcept.getLowAbsolute();
 
 					if (hi != null && numericValue > hi) {
-						// Option 1: clamp
-						numericValue = hi;
-
-						// Option 2 (alternative): skip instead of clamp
-						// return;
+						numericValue = hi;   // clamp to upper bound
 					}
 
 					if (low != null && numericValue < low) {
-						numericValue = low;
+						numericValue = low;  // clamp to lower bound
 					}
 				}
 
-				obs.setValueNumeric(numericValue);
+// safe to use numeric value
+				if (Double.isFinite(numericValue)) {
+					obs.setValueNumeric(numericValue);
+				}
 			}
 
 			// =========================
@@ -400,7 +425,7 @@ public class LabwareFacilityWideResultsMapper {
 			}
 
 		} catch (Exception e) {
-			System.out.println("Failed to set obs value [" + value + "] for concept " + concept.getUuid());
+			if (debugMode) System.out.println("Failed to set obs value [" + value + "] for concept " + concept.getUuid());
 		}
 	}
 
@@ -412,6 +437,9 @@ public class LabwareFacilityWideResultsMapper {
 	 * @param obsValue
 	 */
 	private static void setObsValue(Obs obs, Concept concept, Concept obsValue) {
+		if (obs == null || concept == null || obsValue == null) {
+			return;
+		}
 		if (concept.getDatatype().isCoded()) {
 			obs.setValueCoded(obsValue);
 		}
@@ -431,7 +459,7 @@ public class LabwareFacilityWideResultsMapper {
 		o.setPerson(order.getPatient());
 		o.setOrder(order);
 		o.setLocation(Utils.getDefaultLocation());
-		System.out.println("Obs stub created ==>"+o);
+		if (debugMode) System.out.println("Obs stub created ==>"+o);
 		return o;
 	}
 }
