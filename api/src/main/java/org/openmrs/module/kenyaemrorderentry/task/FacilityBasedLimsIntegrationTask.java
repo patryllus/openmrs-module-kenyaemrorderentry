@@ -60,17 +60,19 @@ public class FacilityBasedLimsIntegrationTask extends AbstractTask {
 			try {
 				Order order = limsQueue.getOrder();
 
-				boolean eligible =
-					labsUtils.isOrderForExpressPatient(order) ||
-						!labsUtils.orderHasUnsettledBill(order);
-
+				boolean eligible = labsUtils.orderIsInProgress(order) ;
+				//	labsUtils.isOrderForExpressPatient(order) ||
+				//		!labsUtils.orderIsInProgress(order) ;
+				
+				if (debugMode) System.out.println("Order eligibility to send to lims  ==>"+eligible);
+				
 				if (!eligible) {
 					continue;
 				}
-
+		
 				boolean success = LimsSystemWebRequest
 					.postLabOrderRequestToLims(limsQueue.getPayload());
-
+				if (debugMode) System.out.println("Order Order sent to lims ==>"+success);
 				if (success) {
 					limsQueue.setStatus(LimsQueueStatus.SUBMITTED);
 					limsQueue.setDateLastChecked(new Date());

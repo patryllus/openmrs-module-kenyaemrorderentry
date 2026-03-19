@@ -31,6 +31,7 @@ import java.util.List;
 
 public class labsUtils {
 	public static String INPATIENT = "a73e2ac6-263b-47fc-99fc-e0f2c09fc914";
+	private static Boolean debugMode = false;
 	/**
 	 * Format gender
 	 *
@@ -147,6 +148,31 @@ public class labsUtils {
 			ret = true;
 		}
 
+		return (ret);
+	}
+	/**
+	 * Checks that the lab order is in Progress.
+	 * Means that the lab order has not pending lab bills
+	 * @should return true if an order is in progress
+	 * @param order
+	 * @return
+	 */
+	public static boolean orderIsInProgress(Order order) {
+		debugMode = labsUtils.isLoggingEnabled();
+		boolean ret = false;
+
+		//Check Fulfiller status to ensure that bill has been settled if it exists
+		String fullFillerStatus =
+			order.getFulfillerStatus() != null
+				? order.getFulfillerStatus().toString()
+				: "";
+		if (debugMode) System.out.println("Order Fulfiller status" + fullFillerStatus);
+
+		if (fullFillerStatus.trim().equalsIgnoreCase("IN_PROGRESS")) {
+			if (debugMode) System.out.println("Order has no  pending bill");
+			ret = true;
+		}
+		if (debugMode) System.out.println("Checking order has a pending bill =>"+ret);
 		return (ret);
 	}
 }
