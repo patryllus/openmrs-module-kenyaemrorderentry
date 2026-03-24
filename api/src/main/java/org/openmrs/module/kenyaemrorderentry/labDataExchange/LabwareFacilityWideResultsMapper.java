@@ -167,8 +167,9 @@ public class LabwareFacilityWideResultsMapper {
 				return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("LIMS lab test configuration doesn't support result mapping for test " + orderConcept.getUuid());
 			}
 			if (debugMode) System.out.println("Mapping exists ==>");
-			// setup lab result encounter
-			Encounter enc = new Encounter();
+			// setup lab result encounter		
+			// Use order type encounter
+			Encounter enc = order.getEncounter();
 			enc.setEncounterType(labEncounterType);
 			enc.setEncounterDatetime(order.getDateCreated());
 			enc.setPatient(order.getPatient());
