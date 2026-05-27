@@ -465,23 +465,4 @@ public class LabwareFacilityWideResultsMapper {
 		if (debugMode) System.out.println("Obs stub created ==>"+o);
 		return o;
 	}
-	/**
-	 * SKIP stale lims submissions
-	 * Submissions > 3 days without results
-	 * @param limsQueue
-	 * @return
-	 */
-	private void skipIfStale(LimsQueue limsQueue) {
-		KenyaemrOrdersService kenyaemrOrdersService = Context.getService(KenyaemrOrdersService.class);
-		Date dateOrderCreated = limsQueue.getDateCreated();
-		if (dateOrderCreated != null) {
-			long diffInMillis = new Date().getTime() - dateOrderCreated.getTime();
-			long diffInDays = TimeUnit.MILLISECONDS.toDays(diffInMillis);
-			if (diffInDays > 2) {
-				limsQueue.setDateLastChecked(new Date());
-				limsQueue.setStatus(LimsQueueStatus.SKIPPED);
-				kenyaemrOrdersService.saveLimsQueue(limsQueue);
-			}
-		}
-	}
 }
