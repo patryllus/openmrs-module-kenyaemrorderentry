@@ -1002,7 +1002,7 @@ public class HibernateKenyaemrOrdersDAO implements KenyaemrOrdersDAO {
         criteria.add(Restrictions.eq("voided", false));
 		criteria.add(Restrictions.or(Restrictions.isNull("dateLastChecked"), Restrictions.le("dateLastChecked", createdOnOrBeforeDate)));
         criteria.addOrder(org.hibernate.criterion.Order.asc("id"));
-        criteria.setMaxResults(100);
+        criteria.setMaxResults(10000);
 
         return criteria.list();
     }
@@ -1019,7 +1019,7 @@ public class HibernateKenyaemrOrdersDAO implements KenyaemrOrdersDAO {
 		criteria.add(Restrictions.eq("voided", false));
 		criteria.add(Restrictions.or(Restrictions.isNotNull("dateLastChecked"), Restrictions.ge("dateLastChecked", createdOnOrAfterDate)));	
 		criteria.addOrder(org.hibernate.criterion.Order.asc("id"));
-		criteria.setMaxResults(100);
+		criteria.setMaxResults(10000);
 
 		return criteria.list();
 	}

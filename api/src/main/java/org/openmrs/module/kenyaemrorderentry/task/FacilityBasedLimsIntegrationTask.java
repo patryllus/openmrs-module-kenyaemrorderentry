@@ -100,9 +100,28 @@ public class FacilityBasedLimsIntegrationTask extends AbstractTask {
 
 						if (!eligible) {
 
-							// Prevent infinite re-processing
-							limsQueue.setDateLastChecked(new Date());
-							kenyaemrOrdersService.saveLimsQueue(limsQueue);
+							Date dateOrderCreated = limsQueue.getDateCreated();
+
+							if (dateOrderCreated != null) {
+
+								long diffInMillis = new Date().getTime() - dateOrderCreated.getTime();
+
+								long diffInDays =
+									java.util.concurrent.TimeUnit.MILLISECONDS.toDays(diffInMillis);
+
+								if (diffInDays > 2) {
+
+									limsQueue.setDateLastChecked(new Date());
+									limsQueue.setStatus(LimsQueueStatus.SKIPPED);
+
+									kenyaemrOrdersService.saveLimsQueue(limsQueue);
+
+									if (debugMode) {
+										System.out.println(
+											"Skipping stale LIMS queue item older than 2 days from date created: " + limsQueue.getUuid());
+									}
+								}
+							}
 
 							continue;
 						}
@@ -134,7 +153,7 @@ public class FacilityBasedLimsIntegrationTask extends AbstractTask {
 					}
 				}
 
-			} while (fetched == 100);
+			} while (fetched == 10000);
 
 			if (debugMode) {
 				System.out.println(

@@ -23,6 +23,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * A class for mapping lab tests and results between a labware facility-wide implementation and the EMR
@@ -294,6 +295,7 @@ public class LabwareFacilityWideResultsMapper {
 					kenyaemrOrdersService.saveLimsQueue(limsQueue);
 				}
 				return ResponseEntity.status(HttpStatus.OK).body("Lab results updated successfully");
+				
 
 			} catch (Exception e) {
 				if (debugMode) System.out.println(e.getMessage());
@@ -462,5 +464,24 @@ public class LabwareFacilityWideResultsMapper {
 		o.setLocation(Utils.getDefaultLocation());
 		if (debugMode) System.out.println("Obs stub created ==>"+o);
 		return o;
+	}
+	/**
+	 * SKIP stale lims submissions
+	 * Submissions > 3 days without results
+	 * @param limsQueue
+	 * @return
+	 */
+	private void skipIfStale(LimsQueue limsQueue) {
+		KenyaemrOrdersService kenyaemrOrdersService = Context.getService(KenyaemrOrdersService.class);
+		Date dateOrderCreated = limsQueue.getDateCreated();
+		if (dateOrderCreated != null) {
+			long diffInMillis = new Date().getTime() - dateOrderCreated.getTime();
+			long diffInDays = TimeUnit.MILLISECONDS.toDays(diffInMillis);
+			if (diffInDays > 2) {
+				limsQueue.setDateLastChecked(new Date());
+				limsQueue.setStatus(LimsQueueStatus.SKIPPED);
+				kenyaemrOrdersService.saveLimsQueue(limsQueue);
+			}
+		}
 	}
 }
