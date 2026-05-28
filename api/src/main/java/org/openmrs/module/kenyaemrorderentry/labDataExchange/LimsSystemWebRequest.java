@@ -23,6 +23,9 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.joda.time.DateTime;
+import org.joda.time.Months;
+import org.joda.time.Weeks;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -51,6 +54,7 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -132,9 +136,33 @@ public class LimsSystemWebRequest {
             lastName = personName.getFamilyName() != null ? personName.getFamilyName() : "";
         }
 
-        //Age and gender
-        String dob = patient.getBirthdate() != null ? sd.format(patient.getBirthdate()) : null;
-        Age age = new Age(patient.getBirthdate());
+        //Age and patientAgeUnit
+		String dob = patient.getBirthdate() != null ? sd.format(patient.getBirthdate()) : null;
+		Age age = patient.getBirthdate() != null ? new Age(patient.getBirthdate()) : null;
+
+		Date today = new Date();
+		Integer ageInWeeks = getAgeInWeeks(person.getBirthdate(), today);
+		Integer ageInMonths = getAgeInMonths(person.getBirthdate(), today);
+
+// Construct age value + unit
+		Integer patientAge = null;
+		String patientAgeUnit = null;
+
+		if (age != null) {
+
+			if (age.getFullYears() >= 1) {
+				patientAge = age.getFullYears();
+				patientAgeUnit = "YEARS";
+
+			} else if (age.getFullMonths() >= 1) {
+				patientAge = ageInMonths;
+				patientAgeUnit = "MONTHS";
+
+			} else {
+				patientAge = ageInWeeks;
+				patientAgeUnit = "WEEKS";
+			}
+		}
 
         //Gets final and preliminary diagnosis
         DiagnosisService diagnosisService = Context.getDiagnosisService();
@@ -176,7 +204,8 @@ public class LimsSystemWebRequest {
 
         payload.put("locationReference", ward);
 		payload.put("subjectIdentifier", openmrsId);
-        payload.put("patientAge", age);
+        payload.put("patientAge", patientAge);
+        payload.put("patientAgeUnit", patientAgeUnit);
         payload.put("patientBed", "");
         payload.put("patientBirthDate", dob);
         payload.put("patientGivenName", firstName);
@@ -351,6 +380,18 @@ public class LimsSystemWebRequest {
 		// finally
         httpClient.close();
     }
+
+	public static Integer getAgeInWeeks(Date birtDate, Date context) {
+		DateTime d1 = new DateTime(birtDate.getTime());
+		DateTime d2 = new DateTime(context.getTime());
+		return Weeks.weeksBetween(d1, d2).getWeeks();
+	}
+
+	public static Integer getAgeInMonths(Date birtDate, Date context) {
+		DateTime d1 = new DateTime(birtDate.getTime());
+		DateTime d2 = new DateTime(context.getTime());
+		return Months.monthsBetween(d1, d2).getMonths();
+	}
 
 }
 
