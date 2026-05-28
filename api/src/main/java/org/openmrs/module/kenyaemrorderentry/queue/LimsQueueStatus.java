@@ -3,6 +3,7 @@ package org.openmrs.module.kenyaemrorderentry.queue;
 public enum LimsQueueStatus {
     QUEUED ("QUEUED"),
     SUBMITTED ("SUBMITTED"),
+	SKIPPED ("SKIPPED"),
     ERROR ("ERROR"),
     COMPLETED ("COMPLETED");
     private final String name;
