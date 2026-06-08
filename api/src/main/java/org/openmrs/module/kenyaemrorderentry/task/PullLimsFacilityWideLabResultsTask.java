@@ -68,20 +68,16 @@ public class PullLimsFacilityWideLabResultsTask extends AbstractTask {
 						if (debugMode) System.out.println("Found tests with pending results");
 						for (LimsQueue queueEntry : testsWithPendingResults) {
 							activeTestOrders.add(queueEntry.getOrder().getOrderId());
-							try {
-								// Pull Lab Results and persist		
-								if (debugMode) System.out.println("Pull Lab Results and persist");
-								LimsSystemWebRequest.pullFacilityWideLimsLabResult(activeTestOrders);
-
-							} catch (Exception e) {
-								throw new IllegalArgumentException("Lab Results Get: Unable to execute task that pulls lab requests", e);
-							}
 						}
-						if (testsWithPendingResults.isEmpty()) {
-							if (debugMode) System.out.println("LIMS-EMR integration: there are no lab tests with pending results");
-							return;
+						try {
+							if (debugMode) System.out.println("Pull Lab Results and persist");
+							LimsSystemWebRequest.pullFacilityWideLimsLabResult(activeTestOrders);
+						} catch (Exception e) {
+							throw new IllegalArgumentException("Lab Results Get: Unable to execute task that pulls lab requests", e);
 						}
-
+					} else {
+						if (debugMode) System.out.println("LIMS-EMR integration: there are no lab tests with pending results");
+						return;
 					}
 				}
 
