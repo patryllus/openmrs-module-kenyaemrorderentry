@@ -75,14 +75,17 @@ public class LimsIntegration implements AfterReturningAdvice {
                             try {
                                 if (labsUtils.isOrderForExpressPatient(order)) { // send to LIMS only if order is for express patient
                                     LimsSystemWebRequest.postLabOrderRequestToLims(limsPayload.toJSONString());
+									limsQueue.setDateLastChecked(new Date());
                                     limsQueue.setStatus(LimsQueueStatus.SUBMITTED);
                                     service.saveLimsQueue(limsQueue);
                                 } else { // queue for additional billing check before submission
                                     limsQueue.setStatus(LimsQueueStatus.QUEUED);
+									limsQueue.setDateLastChecked(new Date());
                                     service.saveLimsQueue(limsQueue);
                                 }
                             } catch (Exception e) {
                                 limsQueue.setStatus(LimsQueueStatus.QUEUED);
+								limsQueue.setDateLastChecked(new Date());
                                 service.saveLimsQueue(limsQueue);
                                 System.out.println(e.getMessage());
                             }
