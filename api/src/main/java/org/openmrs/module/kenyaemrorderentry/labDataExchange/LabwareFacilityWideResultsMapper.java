@@ -328,7 +328,7 @@ public class LabwareFacilityWideResultsMapper {
 		}
 
 		ConceptDatatype dt = concept.getDatatype();
-		String value = rawValue.toString().trim();
+		String value = rawValue.toString().trim().replaceFirst("^(>=|<=|>|<)\\s*", "");;
 
 		// Handle LIMS null-like values
 		if (value.isEmpty() ||
