@@ -144,7 +144,7 @@ public class LimsSystemWebRequest {
 		Integer ageInWeeks = getAgeInWeeks(person.getBirthdate(), today);
 		Integer ageInMonths = getAgeInMonths(person.getBirthdate(), today);
 
-// Construct age value + unit
+        // Construct age value + unit
 		Integer patientAge = null;
 		String patientAgeUnit = null;
 
