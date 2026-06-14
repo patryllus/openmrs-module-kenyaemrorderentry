@@ -19,9 +19,4 @@ jobs:
       tomcat_service: "tomcat9"
       command_timeout: "200m"
 
-    secrets:
-      cicd_host: ${{ secrets.CICD_HOST }}
-      cicd_username: ${{ secrets.CICD_USERNAME }}
-      cicd_secret: ${{ secrets.CICD_SECRET }}
-      cicd_port: ${{ secrets.PORT }}
-      cicd_token: ${{ secrets.CICD_TOKEN }}
+    secrets: inherit
