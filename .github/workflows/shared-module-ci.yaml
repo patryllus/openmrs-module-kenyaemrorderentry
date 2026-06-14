@@ -18,5 +18,4 @@ jobs:
       openmrs_modules_dir: "/var/lib/OpenMRS/modules"
       tomcat_service: "tomcat9"
       command_timeout: "200m"
-
     secrets: inherit
