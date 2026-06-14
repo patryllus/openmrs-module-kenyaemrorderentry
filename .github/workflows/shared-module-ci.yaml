@@ -5,6 +5,7 @@ on:
     branches:
       - master
 
+
 jobs:
   deploy-module:
     uses: Palladium-hub/platform-ci/.github/workflows/kenyaemr-module-ci.yaml@main
