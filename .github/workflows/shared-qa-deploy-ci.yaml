@@ -1,0 +1,12 @@
+name: Deploy to QA Server
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    uses: Palladium-hub/platform-ci/.github/workflows/backend-qa-ci.yaml@main
+    with:
+      repo_name: "openmrs-module-kenyaemrorderentry"
+    secrets: inherit
