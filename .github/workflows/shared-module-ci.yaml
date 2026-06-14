@@ -1,0 +1,27 @@
+name: KenyaEMR Module CI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy-module:
+    uses: Palladium-hub/platform-ci/.github/workflows/kenyaemr-module-ci.yaml@main
+    with:
+      deploy_branch: "master"
+      source_branch: "master"
+      module_repo: "Palladium-hub/openmrs-module-kenyaemrorderentry"
+      module_dir_name: "openmrs-module-kenyaemrorderentry"
+      remote_base_dir: "/apps/githubworkflows/kenyaemr-modules"
+      omod_glob: "kenyaemrorderentry-*.omod"
+      openmrs_modules_dir: "/var/lib/OpenMRS/modules"
+      tomcat_service: "tomcat9"
+      command_timeout: "200m"
+
+    secrets:
+      cicd_host: ${{ secrets.CICD_HOST }}
+      cicd_username: ${{ secrets.CICD_USERNAME }}
+      cicd_secret: ${{ secrets.CICD_SECRET }}
+      cicd_port: ${{ secrets.PORT }}
+      cicd_token: ${{ secrets.CICD_TOKEN }}
